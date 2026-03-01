@@ -11,6 +11,7 @@ import { createBinaryBlob, createTextBlob, isDocContentSame, unique } from "./li
 export class PeerCouchDB extends Peer {
     man: DirectFileManipulator;
     declare config: PeerCouchDBConf;
+    private _startPromise: Promise<void> | undefined;
     constructor(conf: PeerCouchDBConf, dispatcher: DispatchFun) {
         super(conf, dispatcher);
         this.man = new DirectFileManipulator(conf);
@@ -18,7 +19,7 @@ export class PeerCouchDB extends Peer {
         this.man.since = this.getSetting("since") || "now";
     }
     async delete(pathSrc: string): Promise<boolean> {
-        await this.man.ready.promise;
+        await this._startPromise;
         const path = this.toLocalPath(pathSrc);
         if (await this.isRepeating(pathSrc, false)) {
             return false;
@@ -32,7 +33,7 @@ export class PeerCouchDB extends Peer {
         return r;
     }
     async put(pathSrc: string, data: FileData): Promise<boolean> {
-        await this.man.ready.promise;
+        await this._startPromise;
         const path = this.toLocalPath(pathSrc);
         if (await this.isRepeating(pathSrc, data)) {
             return false;
@@ -95,6 +96,10 @@ export class PeerCouchDB extends Peer {
         };
     }
     async start(): Promise<void> {
+        this._startPromise = this._doStart();
+        await this._startPromise;
+    }
+    private async _doStart(): Promise<void> {
         const baseDir = this.toLocalPath("");
         await this.man.ready.promise;
         const w = await this.man.rawGet<Record<string, any>>(MILESTONE_DOCID);
